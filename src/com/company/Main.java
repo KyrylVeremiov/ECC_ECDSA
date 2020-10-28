@@ -1,85 +1,86 @@
 package com.company;
 import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.DERSequenceGenerator;
+import org.bouncycastle.asn1.ocsp.Signature;
+import org.bouncycastle.asn1.sec.ECPrivateKey;
 import org.bouncycastle.asn1.x9.ECNamedCurveTable;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECNamedDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
+import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
+import org.bouncycastle.jce.interfaces.ECPublicKey;
+import org.bouncycastle.jce.spec.ECParameterSpec;
+import org.bouncycastle.jce.spec.ECPrivateKeySpec;
+import org.bouncycastle.jce.spec.ECPublicKeySpec;
 import org.bouncycastle.math.ec.ECCurve;
-import org.bouncycastle.math.ec.ECCurve.Fp;
-import org.bouncycastle.math.ec.ECFieldElement;
-import org.bouncycastle.math.ec.ECMultiplier;
 import org.bouncycastle.math.ec.ECPoint;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.Signature;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 
 public class Main {
+    static BigInteger m1=new BigInteger("-1");
+    static  String curve_name="secp256k1";
 
-    public static void main(String[] args) {
+    static X9ECParameters curveParams =ECNamedCurveTable.getByName(curve_name);
+    static ECCurve curve= curveParams.getCurve();
 
-        BigInteger m1=new BigInteger("-1");
+    static ECDomainParameters domain= new ECDomainParameters(curveParams.getCurve(),curveParams.getG(),curveParams.getN(),curveParams.getH());
+    static ECParameterSpec parameterSpec= new ECParameterSpec(curveParams.getCurve(),curveParams.getG(),curveParams.getN(),curveParams.getH());
+    static ECPoint G=curveParams.getG();
+
+    //      H may by any point
+            static ECPoint H=G.multiply(new BigInteger("3")).normalize();
+
+//    static byte[] Hb= new byte[]{ 0x04,
+//            0x50, (byte) 0x92, (byte) 0x9b, 0x74, (byte) 0xc1, (byte) 0xa0, 0x49, 0x54,
+//            (byte) 0xb7, (byte) 0x8b, 0x4b, 0x60, 0x35, (byte) 0xe9, 0x7a, 0x5e,
+//            0x07, (byte) 0x8a, 0x5a, 0x0f, 0x28, (byte) 0xec, (byte) 0x96, (byte) 0xd5,
+//            0x47, (byte) 0xbf, (byte) 0xee, (byte) 0x9a, (byte) 0xce, (byte) 0x80, 0x3a, (byte) 0xc0,
+//            0x31, (byte) 0xd3, (byte) 0xc6, (byte) 0x86, 0x39, 0x73, (byte) 0x92, 0x6e,
+//            0x04, (byte) 0x9e, 0x63, 0x7c, (byte) 0xb1, (byte) 0xb5, (byte) 0xf4, 0x0a,
+//            0x36, (byte) 0xda, (byte) 0xc2, (byte) 0x8a, (byte) 0xf1, 0x76, 0x69, 0x68,
+//            (byte) 0xc3, 0x0c, 0x23, 0x13, (byte) 0xf3, (byte) 0xa3, (byte) 0x89, 0x04};
+//
+//    static ECPoint H=curve.decodePoint(Hb);
 
 
-        X9ECParameters curve_params =ECNamedCurveTable.getByName("secp256k1");
-        ECCurve curve= curve_params.getCurve();
+    private static BigInteger[] sign(final byte[] dataHash, final ECPrivateKeySpec privateKey) {
+        final ECDSASigner signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
 
-        ECPoint G0=curve_params.getG();
+        final ECPrivateKeyParameters privateKeyParameters =
+                new ECPrivateKeyParameters(privateKey.getD(), domain);
 
-        ECPoint G=G0.multiply(new BigInteger("2")).normalize();
-        ECPoint H=G0.multiply(new BigInteger("3")).normalize();
+        signer.init(true, privateKeyParameters);
+
+        return signer.generateSignature(dataHash);
+    }
+    private static boolean verify (final byte[] dataHash, BigInteger r,BigInteger s, final ECPublicKeySpec publicKey){
+        final ECDSASigner signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
+
+        final ECPublicKeyParameters publicKeyParameters =
+                new ECPublicKeyParameters(publicKey.getQ(), domain);
+        signer.init(false,publicKeyParameters);
+
+        return signer.verifySignature(dataHash,r,s);
+    }
+
+    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException {
         curve.validatePoint(G.getXCoord().toBigInteger(),G.getYCoord().toBigInteger());
         curve.validatePoint(H.getXCoord().toBigInteger(),H.getYCoord().toBigInteger());
 
 
 
-
-
-
-//        BigInteger prime = new BigInteger("57896044618658097711785492504343953926634992332820282019728792003956564821041");
-//        BigInteger A = new BigInteger("7");
-//        BigInteger B = new BigInteger("43308876546767276905765904595650931995942111794451039583252968842033849580414");
-//
-//        ECCurve curve = new ECCurve.Fp(prime, A, B);
-//
-//        BigInteger Gx = new BigInteger("2");
-//        BigInteger Gy = new BigInteger("4018974056539037503335449422937059775635739389905545080690979365213431566280");
-//        BigInteger Hx = new BigInteger("57520216126176808443631405023338071176630104906313632182896741342206604859403");
-//        BigInteger Hy = new BigInteger("17614944419213781543809391949654080031942662045363639260709847859438286763994");
-//
-//        ECPoint G = curve.validatePoint(Gx, Gy);
-//        ECPoint H = curve.validatePoint(Hx, Hy);
-////        ECPoint R = G.add(H).normalize();
-////        R=R.multiply(new BigInteger("12")).normalize();
-////
-////        curve.validatePoint(R.getXCoord().toBigInteger(),R.getYCoord().toBigInteger());
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //1
+        System.out.println("№1\n\n");
+
         BigInteger r1= new BigInteger("28");
         BigInteger v1= new BigInteger("3");
         ECPoint Gr1=G.multiply(r1);
@@ -113,10 +114,11 @@ public class Main {
         BigInteger Y2_1t2y=Y2_1t2.getYCoord().toBigInteger();
 
         System.out.println("p:"+ p);
-        System.out.println("Y2_1t1:");
 
+        System.out.println("Y2_1t1:");
         System.out.println(Y2_1t1x);
         System.out.println(Y2_1t1y);
+
         System.out.println("Y2_1t2:");
         System.out.println(Y2_1t2x);
         System.out.println(Y2_1t2y);
@@ -125,28 +127,22 @@ public class Main {
 
 //2
 
-        //order of a point
-//        BigInteger N1=curve.getOrder();
-//        BigInteger N1= curve_params.getN();
-//        BigInteger n=dividors_N
-//        System.out.println(N1);
+        System.out.println("\n\n№2\n\n");
 
-//        ECDSASigner signer = new ECDSASigner (new HMacDSAKCalculator(new SHA256Digest()));
-//        ECDomainParameters parametrs=new new ECDomainParameters(curve,G,N);
-//        signer.init (true, new ECPrivateKeyParameters(p,parametrs));
-//        BigInteger[] signature = signer.generateSignature (hash);
-//        ByteArrayOutputStream s = new ByteArrayOutputStream ();
-//        try
-//        {
-//            DERSequenceGenerator seq = new DERSequenceGenerator (s);
-//            seq.addObject (new ASN1Integer(signature[0]));
-//            seq.addObject (new ASN1Integer (signature[1]));
-//            seq.close ();
-//            s.toByteArray ();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
+        String dataStr="12345";
+        byte[] data=dataStr.getBytes();
 
+        ECPublicKeySpec publicKey1= new ECPublicKeySpec(Y2_1t1,parameterSpec);
+        ECPublicKeySpec publicKey2= new ECPublicKeySpec(Y2_1t2,parameterSpec);
+        ECPrivateKeySpec privateKey=new ECPrivateKeySpec(p,parameterSpec);
+
+        BigInteger[] signature= sign(data,privateKey);
+
+        System.out.println("Y2_1t1:");
+        System.out.println(verify(data,signature[0],signature[1],publicKey1));
+
+        System.out.println("Y2_1t2:");
+        System.out.println(verify(data,signature[0],signature[1],publicKey2));
 
     }
 }
