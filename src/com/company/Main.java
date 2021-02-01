@@ -18,6 +18,9 @@ public class Main {
 
     static final X9ECParameters curveParams = ECNamedCurveTable.getByName(curve_name);
     static final ECCurve curve= curveParams.getCurve();
+    static final ECParameterSpec parameterSpec= new ECParameterSpec(curveParams.getCurve(),curveParams.getG(),curveParams.getN(),curveParams.getH());
+    static final ECDomainParameters domain= new ECDomainParameters(curveParams.getCurve(),curveParams.getG(),curveParams.getN(),curveParams.getH());
+
     static final ECPoint G=curveParams.getG();
     static final ECPoint H=G.multiply(new BigInteger("3")).normalize();
 

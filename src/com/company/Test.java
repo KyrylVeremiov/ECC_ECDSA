@@ -106,6 +106,15 @@ public class Test {
         BigInteger Y2_1t2x=Y2_1t2.getXCoord().toBigInteger();
         BigInteger Y2_1t2y=Y2_1t2.getYCoord().toBigInteger();
 
+
+//        ECPoint Y2_1t1= Y2.add(Y1.multiply(m1));
+//        ECPoint Y2_1t2=G.multiply(p);
+//
+//        BigInteger Y2_1t1x=Y2_1t1.normalize().getAffineXCoord().toBigInteger();
+//        BigInteger Y2_1t1y=Y2_1t1.normalize().getAffineYCoord().toBigInteger();
+//        BigInteger Y2_1t2x=Y2_1t2.normalize().getAffineXCoord().toBigInteger();
+//        BigInteger Y2_1t2y=Y2_1t2.normalize().getAffineYCoord().toBigInteger();
+
         System.out.println("p:"+ p);
 
         System.out.println("Y2_1t1:");
