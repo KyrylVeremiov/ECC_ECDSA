@@ -181,7 +181,6 @@ public class User {
             } catch (IOException | ParseException e) {
                 e.printStackTrace();
             }
-
         }
 
         private static void prepareTransaction(){
@@ -220,7 +219,7 @@ public class User {
 
         private static ECPoint rsG;
         private static ECPoint ksG;
-        private static ECPoint co;//Receiver needs it indeed ?
+        private static ECPoint co;//Does Receiver need it indeed?
         private static BigInteger amountToSend;
         private static BigInteger uuid;
         private static BigInteger lockHeight;
