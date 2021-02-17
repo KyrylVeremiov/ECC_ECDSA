@@ -6,12 +6,18 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import javax.net.ServerSocketFactory;
+import javax.net.SocketFactory;
+import java.io.*;
 import java.math.BigInteger;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
 
 public class User {
     private static BigInteger usersAmount;
@@ -57,6 +63,20 @@ public class User {
            BigInteger n= new BigInteger(String.valueOf((new SecureRandom().nextLong())));
             return n.signum()>0?n:n.multiply(new BigInteger("-1"));
         }
+
+//        private static void sendFile(Socket socket, File file) throws IOException {
+//            DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+//
+//
+//            byte[] fileContent = Files.readAllBytes(file.toPath());
+//            output.write(fileContent);
+//        }
+//
+//        private static void getFile(Socket socket, File file) throws IOException {
+//            DataInputStream input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+//            input.readAllBytes();
+//
+//        }
 
         private static class UTXO {
             BigInteger TransactionUUID;
@@ -110,6 +130,11 @@ public class User {
         private static ECPoint krG;
         private static BigInteger sr;
 
+
+
+        private static final String RESPONSE_S="responseS.json";
+        private static final String REQUEST_S="requestS.json";
+
 //        private static [] s;//signature
 
         //    private static transactionInputs;
@@ -130,6 +155,38 @@ public class User {
 //            }
 //        }
 
+        private static final int port=90;//getPort(...);
+        private static final String host = "127.0.0.1";//getHost(...);
+        private static Socket socket;
+        private static DataOutputStream output;
+        private static DataInputStream input;
+
+        private static void sendToRecipient() throws IOException, InterruptedException {
+            prepareRequest();
+            makeRequestFile();
+            sendRequestFile();
+        }
+
+        private static void send() throws IOException {
+//            makeConnection();
+//            prepareRequest();
+//            makeRequestFile();
+//            sendRequestFile();
+            getResponseFile();
+            parseResponseFile();
+            prepareTransaction();
+            sendTransaction();
+        }
+
+
+        private static void makeConnection() throws IOException {
+            SocketFactory socketfactory = SocketFactory.getDefault();
+            socket = socketfactory
+                    .createSocket(host, port);
+            output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+            input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+        }
+
         private static void prepareRequest() {
             BigInteger blindingFactorsSum = new BigInteger("0");//xl
 //!!!!!!!!!!!!!
@@ -139,12 +196,12 @@ public class User {
             co = Main.G;
             lockHeight = new BigInteger("1");
             uuid = new BigInteger("1");
-
             amountToSend = new BigInteger("1");
-            sendRequest();
         }
 
-        private static void sendRequest() {
+        private static void makeRequestFile() throws IOException {
+            File file = new File(REQUEST_S);
+
             JSONObject jo = new JSONObject();
             jo.put(AMOUNT_TO_SEND, amountToSend.toString());
             jo.put(UUID, uuid.toString());
@@ -152,19 +209,85 @@ public class User {
             jo.put(CO, co.toString());
             jo.put(RSG, rsG.toString());
             jo.put(KSG, ksG.toString());
-            try (FileWriter file = new FileWriter("request.json")) {
-                file.write(jo.toString());
-                file.flush();
+//            try (FileWriter file = new FileWriter("request.json")) {
+            try (FileWriter fileWriter = new FileWriter(REQUEST_S)) {
+
+                fileWriter.write(jo.toString());
+                fileWriter.flush();
+//                fileWriter.close();
             } catch (IOException exception) {
                 exception.printStackTrace();
             }
         }
 
-        private static void getResponse(){
+        private static void sendRequestFile() throws IOException, InterruptedException {
+//            String str= "Hello";
+            byte[] fileContent = Files.readAllBytes(Path.of(REQUEST_S));
+
+//            output.write(fileContent);
+
+//                output.write(fileContent, 0, fileContent.length);
+
+//            output.close();
+//            input.close();
+//            socket.close();
+
+            InputStream in = new FileInputStream(REQUEST_S);
+            OutputStream out = socket.getOutputStream();
+            byte[] bytes = new byte[16 * 1024];
+
+            int count;
+            while ((count = in.read(bytes)) > 0) {
+                out.write(bytes, 0, count);
+            }
+            out.write("/".getBytes());
+            System.out.println(3);
+            Sender.send();
+        }
+
+        private static void getResponseFile() throws IOException {
+
+            File file = new File(RESPONSE_S);
+            FileOutputStream fos = new FileOutputStream(file.getPath());
+//            System.out.println(7);
+//            byte[] bytes= input.readAllBytes();
+//            fos.write(bytes);
+
+            System.out.println(7);
+            int in = input.read();
+            System.out.println(7.5);
+//            System.out.println(in);
+            while (in !=(int)'/') {
+//                                System.out.println(buffer);
+                fos.write(in);
+                in = input.read();
+//                System.out.println(in);
+//                                output.write(buffer, 0, count);
+            }
+            System.out.println(7.7);
+
+//            int in=input.read();
+//            while (in!=-1)
+//            {
+////                                System.out.println(buffer);
+//                fos.write(in);
+//                in=input.read();
+////                            System.out.println(in);
+////                                output.write(buffer, 0, count);
+//            }
+
+//            input.close();
+            fos.close();
+            parseResponseFile();
+//            prepareTransaction();
+            socket.close();
+        }
+
+        private static void parseResponseFile(){
 
             JSONParser jsonParser = new JSONParser();
 
-            try (FileReader reader = new FileReader("response.json")) {
+            try (FileReader reader = new FileReader(RESPONSE_S)) {
                 //Read JSON file
                 Object obj = jsonParser.parse(reader);
 
@@ -224,12 +347,160 @@ public class User {
         private static BigInteger uuid;
         private static BigInteger lockHeight;
 
+        private static final String RESPONSE_R="responseR.json";
+        private static final String REQUEST_R="requestR.json";
 
-        private static void getRequestFile() {
+        private static Server server;
+
+//        public Recipient(){
+//            server= new Server();
+//        }
+
+        private static void send(){
+//            makeConnection();
+//            parseRequestFile();
+//            prepareResponseFile();
+            try {
+                sendResponseFile();
+            } catch (IOException exception) {
+                exception.printStackTrace();
+            }
+        }
+
+        private static void makeConnection(){
+            server=new Server();
+            server.start();
+        }
+
+        private static class Server extends Thread {
+            static final int port= 90;
+
+
+            private ServerSocket serversocket;
+            private List<ConnectedClient> clients = new ArrayList<>();
+
+
+            @Override
+            public void run() {
+
+                ServerSocketFactory factory = (ServerSocketFactory) ServerSocketFactory.getDefault();
+                try {
+                    serversocket = (ServerSocket) factory.createServerSocket(port);
+
+//                Socket socket = (Socket) serversocket.accept();
+//                socket = new SServerSocket();
+
+                    while (true) {
+                        Socket socket2=serversocket.accept();
+                        ConnectedClient client = new ConnectedClient(socket2);
+                        clients.add(client);
+                        client.start();
+                    }
+                } catch (IOException exception) {
+                    exception.printStackTrace();
+                }
+            }
+
+            private void main() throws IOException {
+                this.start();
+            }
+
+
+
+            private class ConnectedClient extends Thread {
+                private Socket socket;
+                private DataInputStream input;
+                private DataOutputStream output;
+
+
+                private ConnectedClient(Socket s) throws IOException {
+                    socket = s;
+                    System.out.println("new user connected from " + s.getInetAddress().toString());
+                    output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+                    input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+
+                }
+
+                @Override
+                public void run() {
+                    try {
+                        System.out.println(2);
+
+                        File file = new File(REQUEST_R);
+                        FileOutputStream fos = new FileOutputStream(file.getPath());
+
+
+
+//                            while (socket.isConnected()) {
+//                                byte[] bytes= input.readAllBytes();
+//                                System.out.println(bytes);
+//                                fos.write(bytes);
+//                                break;
+//                            }
+//                        FileOutputStream fos = new FileOutputStream("test.json");requestR
+//                        FileOutputStream fos = new FileOutputStream("requestR.json");
+////                        System.out.println(socket.isClosed());
+//
+                                int in = input.read();
+                                System.out.println(3.5);
+//                                System.out.println(in);
+                                while (in != (int)'/') {
+//                                System.out.println(buffer);
+                                    fos.write(in);
+                                    in = input.read();
+//                                    System.out.println(in);
+//                                output.write(buffer, 0, count);
+                                }
+
+//                        InputStream in = socket.getInputStream();
+//                        OutputStream out=new FileOutputStream(REQUEST_R);
+//
+//
+////                    while (socket.isConnected()) {
+//                        int count;
+//                        System.out.println(2.5);
+//                        byte[] buffer = new byte[8192]; // or 4096, or more
+//                        while ((count = in.read(buffer)) > 0)
+//                        {
+//                            System.out.println(2.7);
+//                            out.write(buffer, 0, count);
+//                        }
+//                        break;
+//                    }
+//                        in.close();
+//                        out.close();
+
+//                        input.close();
+//                        fos.close();
+////                        socket.close();
+                        System.out.println(4);
+
+                        parseRequestFile();
+                        prepareResponseFile();
+
+//                        while (!socket.isClosed());
+
+                    } catch (IOException e) {
+                        System.out.println(e.toString());
+                    } finally {
+                        System.out.println("user disconnected from " + socket.getInetAddress().toString());
+                    }
+                }
+
+//                public void send(String s) throws IOException {
+//                    output.write(s.getBytes());
+////                    output.flush();
+//                }
+            }
+        }
+
+        private static void parseRequestFile() {
+
+            System.out.println(5);
 
             JSONParser jsonParser = new JSONParser();
 
-            try (FileReader reader = new FileReader("request.json")) {
+            try (FileReader reader = new FileReader(REQUEST_R)) {
                 //Read JSON file
                 Object obj = jsonParser.parse(reader);
 
@@ -243,7 +514,6 @@ public class User {
                 ksG=Helper.getECPointFromString(sendersRequest.get(Sender.KSG).toString());
                 co=Helper.getECPointFromString(sendersRequest.get(Sender.CO).toString());
 
-                prepareResponse();
 //                System.out.println(rsG.toString());
 //                System.out.println(sendersRequest.get(Sender.RSG));
 //                System.out.println(rsG.equals(Sender.rsG));
@@ -252,29 +522,79 @@ public class User {
                 e.printStackTrace();
             }
         }
-        private static void prepareResponse(){
+
+        private static void prepareResponseFile(){
             sr=Helper.getPartialSignature(lockHeight,ksG,rsG,krG,rrG,kr,rr);
-            sendResponse();
-        }
-        private static void sendResponse(){
+
             JSONObject jo = new JSONObject();
             jo.put(SR, sr.toString());
             jo.put(KRG, krG.toString());
             jo.put(RRG, rrG.toString());
-            try (FileWriter file = new FileWriter("response.json")) {
-                file.write(jo.toString());
-                file.flush();
+            try {
+                File file = new File(RESPONSE_R);
+                FileWriter fileWriter = new FileWriter(file.getPath());
+                fileWriter.write(jo.toString());
+                fileWriter.flush();
+                fileWriter.close();
+
+            } catch (IOException exception) {
+                exception.printStackTrace();
+            }
+            try {
+                sendResponseFile();
             } catch (IOException exception) {
                 exception.printStackTrace();
             }
         }
+
+        private static void sendResponseFile() throws IOException {
+//            File file = new File(RESPONSE_R);
+
+
+//            byte[] fileContent = Files.readAllBytes(Path.of(RESPONSE_R));
+
+            System.out.println(6);
+
+
+            InputStream in = new FileInputStream(RESPONSE_R);
+            OutputStream out = server.clients.get(0).socket.getOutputStream();
+            byte[] bytes = new byte[16 * 1024];
+
+            int count;
+            while ((count = in.read(bytes)) > 0) {
+                out.write(bytes, 0, count);
+            }
+            out.write("/".getBytes());
+            System.out.println(6.5);
+
+//            server.clients.get(0).output.write(fileContent);
+
+
+//            server.clients.get(0).output.close();
+//            server.clients.get(0).input.close();
+//            server.clients.get(0).socket.close();
+        }
     }
 
 
-    public static void main(String[] args){
-        Sender.prepareRequest();
-        Recipient.getRequestFile();
-        Sender.getResponse();
+    public static void main(String[] args) throws IOException, InterruptedException {
+//        Recipient.makeConnection();
+
+//        Recipient.Server server =new Recipient.Server();
+//        server.main();
+        Recipient.makeConnection();
+        Sender.makeConnection();
+        System.out.println(1);
+        Sender.sendToRecipient();
+//        Recipient.send();
+//        Sender.send();
+
+
+//        Sender.makeConnection();
+
+//        Sender.prepareRequest();
+//        Recipient.parceRequestFile();
+//        Sender.getResponse();
     }
 //    User.Sender.Send(addressToSend,amount);
 }
