@@ -335,6 +335,7 @@ public class User {
 
             X2= Main.G.multiply(x2).add(Main.H.multiply(v2)).normalize();
 
+
             Helper.writeLog("Inputs for this transaction:\n" +"Input 1:\nX: \n"+X1+"\nblinding factor: "+x1+"\namount: "+v1+"\nInput 2:\nX: \n"+X2+"\nblinding factor: "+x2+"\namount: "+v2);
 
 
@@ -904,12 +905,12 @@ public class User {
         Helper.prepareLogger();
         Helper.writeLog("Start");
 
-//        Recipient.makeConnection();
-//        Sender.makeConnection();
-////        System.out.println(1);
-//        Sender.sendToRecipient();
-//        Sender.makeTransaction();
-//        Sender.makeTransactionFile();
+        Recipient.makeConnection();
+        Sender.makeConnection();
+//        System.out.println(1);
+        Sender.sendToRecipient();
+        Sender.makeTransaction();
+        Sender.makeTransactionFile();
 
         Recipient.Verifier.parseTransactionFile();
         Recipient.Verifier.verify();
