@@ -12,7 +12,6 @@ import java.io.*;
 import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -116,7 +115,9 @@ public class User {
             return new  BigInteger(out);
         }
 
-        private static BigInteger getPartialSignature(BigInteger lockHeight, ECPoint ksG,ECPoint xsG, ECPoint krG,ECPoint xrG,BigInteger k,BigInteger r){
+        private static BigInteger getPartialSignature(BigInteger lockHeight,
+                                                      ECPoint ksG,ECPoint xsG, ECPoint krG,
+                                                      ECPoint xrG,BigInteger k,BigInteger r){
             BigInteger e= getE(lockHeight, ksG.add(krG).normalize(),xsG.add(xrG).normalize());
             return k.add(e.multiply(r));
         }
@@ -161,7 +162,8 @@ public class User {
         }
 
         private static boolean verifySignature(Signature signature, ECPoint xG, BigInteger e){
-            return signature.getKG().add(xG.multiply(e)).normalize().equals(Main.G.multiply(signature.getS()).normalize());
+            return signature.getKG().add(xG.multiply(e)).normalize().equals(
+                    Main.G.multiply(signature.getS()).normalize());
         }
         public static Signature sign(ECPoint kG,BigInteger s) {
             return new Signature(kG,s);
@@ -230,7 +232,7 @@ public class User {
         private static final BigInteger kS = Helper.randomBigInteger();
         private static BigInteger xS1;
         private static BigInteger xS;
-        private static BigInteger oS=new BigInteger("0");
+        private static final BigInteger oS=new BigInteger("0");
 
         private static ECPoint xSG;
         private static final ECPoint kSG = Main.G.multiply(kS).normalize();
@@ -306,7 +308,7 @@ public class User {
             socket = socketfactory
                     .createSocket(host, port);
 
-            Helper.writeLog("Connected to "+host+" on "+port);
+            Helper.writeLog("Sender has connected to "+host+" on "+port);
 //            System.out.println("Connected "+host+" on "+port);
         }
 
@@ -331,32 +333,42 @@ public class User {
             X1= Main.G.multiply(x1).add(Main.H.multiply(v1)).normalize();
 
             BigInteger x2= Helper.randomBigInteger();
-            BigInteger v2= new BigInteger("12");
+            BigInteger v2= new BigInteger("8");
 
             X2= Main.G.multiply(x2).add(Main.H.multiply(v2)).normalize();
 
+            BigInteger x3= Helper.randomBigInteger();
+            BigInteger v3= new BigInteger("4");
 
-            Helper.writeLog("Inputs for this transaction:\n" +"Input 1:\nX: \n"+X1+"\nblinding factor: "+x1+"\namount: "+v1+"\nInput 2:\nX: \n"+X2+"\nblinding factor: "+x2+"\namount: "+v2);
+            X3= Main.G.multiply(x3).add(Main.H.multiply(v3)).normalize();
+
+            Helper.writeLog("Inputs for this transaction:\n" +"Input 1:\nX: \n"+
+                    X1+"\nblinding factor: "+x1+"\namount: "+v1+"\nInput 2:\nX: \n"+X2+"\nblinding factor: "+
+                    x2+"\namount: "+v2+"\nInput 3:\nX: \n"+X3+"\nblinding factor: "+x3+"\namount: "+v3 + "\n");
 
 
             lockHeight = new BigInteger("25");
             uuid = new BigInteger("123445234003");
-            BigInteger xl=x1.add(x2);
+            BigInteger xl=x1.add(x2).add(x3);
 //            TEST
 
 //            BigInteger xl = new BigInteger("0");
 
-            amountTotal =v1.add(v2);
+            amountTotal =v1.add(v2).add(v3);
             amountChange=amountTotal.subtract(amountToSend);
+            changeOutput =  Main.G.multiply(xC).add(Main.H.multiply(amountChange)).normalize();
+
+            Helper.writeLog("Sum of input blinding factors (xl): "+xl.toString() +"\nTotal input amount: "+amountTotal +"\namountToSend: "+
+                    amountToSend+ "\nchange: "+ amountChange+"\nNew blinding factor for Change output (xC): "+xC+
+                    "\nChangeOutput=xC*G+change*H: "+ changeOutput);
 
             xS1 = xC.subtract(xl);
             xS= xS1.subtract(oS);
-            Helper.writeLog("rs: "+ xS);
+//            Helper.writeLog("xS=xC-xl-oS: "+ xS);
             xSG = Main.G.multiply(xS).normalize();
+            Helper.writeLog("xS=xC-xl: "+ xS.toString()+"\nxSG=xS*G: "+xSG.toString()+ "\nSender Nonce(kS): "+kS+"\nksG=ks*G: "+kSG.toString());
 
 //            change_output = Main.G;
-            changeOutput =  Main.G.multiply(xC).add(Main.H.multiply(amountChange)).normalize();
-            Helper.writeLog("Sum of input blinding factors (xl): "+xl +"\nTotal input amount: "+amountTotal +"\nAmount to send: "+amountToSend+ "\nChange: "+ amountChange+"\nNew blinding factor for Change output: "+xC+"\nChange output: "+ changeOutput);
         }
 
         private static void makeRequestFile() throws IOException {
@@ -366,7 +378,7 @@ public class User {
             jo.put(AMOUNT_TO_SEND, amountToSend.toString());
             jo.put(UUID, uuid.toString());
             jo.put(LOCKHEIGHT, lockHeight.toString());
-            jo.put(CHANGEOUTPUT, changeOutput.toString());
+//            jo.put(CHANGEOUTPUT, changeOutput.toString());
             jo.put(XSG, xSG.toString());
             jo.put(KSG, kSG.toString());
 //            try (FileWriter file = new FileWriter("request.json")) {
@@ -405,8 +417,10 @@ public class User {
             socket.getOutputStream().write((byte)0);
               Helper.sendFile(REQUEST_S,socket);
 //            Sender.send();
-            Helper.writeLog("Request file is sent\nWaiting for response\n\n\n");
-        }
+            Helper.writeLog("Request file is sent\nThere are:\n"+
+                    /*Sender.UUID+"\n"+*/Sender.AMOUNT_TO_SEND+"\n"+Sender.LOCKHEIGHT+"\n"+Sender.XSG+"\n"+Sender.KSG+
+                    "\n\nWaiting for response\n\n\n");
+           }
 
         private static void getResponseFile() throws IOException {
 //
@@ -442,7 +456,7 @@ public class User {
 
 //            input.close();
 //            fos.close();
-            parseResponseFile();
+//            parseResponseFile();
 //            prepareTransaction();
             Helper.getFile(RESPONSE_S,socket);
             Helper.writeLog("Response file is got");
@@ -476,9 +490,7 @@ public class User {
         }
 
         private static void prepareTransaction(){
-            BigInteger sS=Helper.getPartialSignature(lockHeight, kSG, xSG, kRG, xRG, kS, xS1);
-            Helper.writeLog("Sender Schnorr signature (sS): "+sS);
-
+            BigInteger sS=Helper.getPartialSignature(lockHeight, kSG, xSG, kRG, xRG, kS, xS);
             s= sR.add(sS);
             kG= kSG.add(kRG).normalize();
             xG= xRG.add(xSG).normalize();
@@ -486,12 +498,13 @@ public class User {
             signature = Helper.sign(kG,s);
 
             BigInteger e=Helper.getE(lockHeight, kSG.add(kRG).normalize(),xSG.add(xRG).normalize());
+            Helper.writeLog("Variable e=SHA256(kG | xG | M): "+ e.toString()+"\nSender Schnorr signature (sS=kS+e*xR): "+sS+
+                    "Final signature= (kSG+kRG,sS+sR)=(kG,s): "+ signature.toString()+"\n");
 
-            Helper.writeLog("Final signature: "+ signature.toString());
 
             Helper.writeLog("Verification of signature: \n"+Helper.verifySignature(signature,xG,e)+
                     "\nkG+xG*e: "+kG.add(xG.multiply(e)).normalize()+
-                    "\ns*G: "+Main.G.multiply(s).normalize());
+                    "\ns*G: "+Main.G.multiply(s).normalize()+"\n");
 //            sendTransaction();
 //            System.out.println(Main.G.multiply(s).normalize());
 //            System.out.println(kG.add(rG.multiply(e)).normalize());
@@ -501,21 +514,24 @@ public class User {
         private static void makeTransactionFile(){
 //            File file = new File(TRANSACTION);
 
-            JSONObject jo = new JSONObject();
-            jo.put(OUTPUT+"0", changeOutput.toString());
-            jo.put(OUTPUT+"1",recipientOutput.toString());
-            jo.put(INPUT+"0",X1.toString());
-            jo.put(INPUT+"1",X2.toString());
-//            jo.put(UUID, uuid.toString());
 
-//            Transaction kernel
-            jo.put(SIGNATURE,signature.toString());
-            jo.put(LOCKHEIGHT, lockHeight.toString());
-            jo.put(XG, xG.toString());
             try (FileWriter fileWriter = new FileWriter(TRANSACTION)) {
+                JSONObject jo = new JSONObject();
+                jo.put(OUTPUT+"0", changeOutput.toString());
+                jo.put(OUTPUT+"1",recipientOutput.toString());
+                jo.put(INPUT+"0",X1.toString());
+                jo.put(INPUT+"1",X2.toString());
+                jo.put(INPUT+"2",X3.toString());
+    //            jo.put(UUID, uuid.toString());
+
+    //            Transaction kernel
+                jo.put(SIGNATURE,signature.toString());
+                jo.put(LOCKHEIGHT, lockHeight.toString());
+                jo.put(XG, xG.toString());
 
                 fileWriter.write(jo.toString());
                 fileWriter.flush();
+                Helper.writeLog("Transaction file is made");
 //                fileWriter.close();
             } catch (IOException exception) {
                 exception.printStackTrace();
@@ -537,8 +553,10 @@ public class User {
         private static ArrayList<Integer> ports=new ArrayList<Integer>(){{add(90);}};//getPort(...);
         //        private static final String host = "127.0.0.1";//getHost(...);
         private static ArrayList<String> hosts = new ArrayList<String>(){
-            {add("192.168.43.57");}
+//            {add("192.168.43.57");}
+//            {add("127.0.0.1");}
         };//getHost(...);
+
         private static void sendTransactionFile() throws IOException {
 
             SocketFactory socketfactory = SocketFactory.getDefault();
@@ -546,7 +564,10 @@ public class User {
                     .createSocket(hosts.get(0), ports.get(0));
 
             Helper.sendFile(TRANSACTION,socket);
-            Helper.writeLog("Transaction file is sent to "+hosts.get(0)+" on "+ports.get(0));
+            Helper.writeLog("Transaction file is sent to "+hosts.get(0)+" on "+ports.get(0)+
+                    "\nThere are:\n"+Sender.INPUT+"s\n"+Sender.OUTPUT+"s\n"+
+                    "\"Transaction kernell:\"\n\t"+ Sender.SIGNATURE+"\n\t"+
+                    Sender.XG+"\n\t"+Sender.LOCKHEIGHT+"\n");
         }
     }
 
@@ -591,7 +612,7 @@ public class User {
             private static ArrayList<ECPoint> Xi=new ArrayList<ECPoint>();//Inputs
             private static ArrayList<ECPoint> Yi=new ArrayList<ECPoint>();//Outputs
 
-            private static BigInteger lockHeightVerifying;
+            private static BigInteger heightVerifying;
             private static ECPoint xG;
             private static Helper.Signature signature;
 
@@ -605,9 +626,11 @@ public class User {
                     JSONObject sendersRequest = (JSONObject) obj;
                     ECPoint X1 = Helper.getECPointFromString(sendersRequest.get(Sender.INPUT + "0").toString());
                     ECPoint X2 = Helper.getECPointFromString(sendersRequest.get(Sender.INPUT + "1").toString());
+                    ECPoint X3 = Helper.getECPointFromString(sendersRequest.get(Sender.INPUT + "2").toString());
 
                     Xi.add(X1);
                     Xi.add(X2);
+                    Xi.add(X3);
 
                     ECPoint Y1 = Helper.getECPointFromString(sendersRequest.get(Sender.OUTPUT + "0").toString());
                     ECPoint Y2 = Helper.getECPointFromString(sendersRequest.get(Sender.OUTPUT + "1").toString());
@@ -616,7 +639,7 @@ public class User {
                     Yi.add(Y2);
 
 
-                    lockHeightVerifying = new BigInteger(sendersRequest.get(Sender.LOCKHEIGHT).toString());
+                    heightVerifying = new BigInteger(sendersRequest.get(Sender.LOCKHEIGHT).toString());
                     xG = Helper.getECPointFromString(sendersRequest.get(Sender.XG).toString());
                     signature = Helper.getSignatureFromString(sendersRequest.get(Sender.SIGNATURE).toString());
 
@@ -632,28 +655,60 @@ public class User {
                 }
             }
 
-            private static boolean verify() {
+            private static boolean verifyTransaction() {
                 ECPoint X= Xi.get(0);
+                StringBuilder inputs= new StringBuilder("Inputs of transaction:"+ "\nInput" + 0 + ": " + Xi.get(0).toString() + "\n");
                 for (int i = 1; i < Xi.size(); i++) {
                     X=X.add(Xi.get(i)).normalize();
-                    System.out.println(X);
+                    inputs.append("Input").append(i).append(": ").append(Xi.get(i).toString()).append("\n");
                 }
+                Helper.writeLog(inputs.toString());
+
                 ECPoint Y= Yi.get(0);
+                StringBuilder outputs= new StringBuilder("Outputs of transaction:"+"\nOutput" + 0 + ": " + Yi.get(0).toString() + "\n");
+
                 for (int i = 1; i < Yi.size(); i++) {
                     Y=Y.add(Yi.get(i)).normalize();
-                    System.out.println(Y);
+                    outputs.append("Output").append(i).append(": ").append(Yi.get(i).toString()).append("\n");
                 }
+                Helper.writeLog(outputs.toString());
+
+                Helper.writeLog("Sum of inputs (X): "+X.toString()+"\nSum of outputs (Y): "+Y.toString());
 
                 ECPoint Y_X=Y.subtract(X).normalize();
+                BigInteger e=Helper.getE(heightVerifying,signature.getKG(),xG);
+                Helper.writeLog("\nY-X: "+Y_X.toString()+
+                        "\nxG: "+xG.toString()+"\nkG: "+ signature.getKG().toString()+
+                        "\nVariable e=SHA256(kG | xG | M): " + e.toString()+"\n");
+//                Helper.writeLog("xG+G*oS: "+xG.add(Main.G.multiply(Sender.oS)).normalize());
 
-                BigInteger e=Helper.getE(lockHeightVerifying,signature.getKG(),xG);
+                Helper.writeLog("Verification of signature: \n"+Helper.verifySignature(signature,xG,e)+
+                        "\nkG+xG*e: "+signature.getKG().add(xG.multiply(e)).normalize()+
+                        "\ns*G: "+Main.G.multiply(signature.getS()).normalize()+"\n");
 
-                System.out.println();
-                System.out.println(Y_X);
-                System.out.println(xG);
-                System.out.println(Main.G.multiply(signature.getS()).normalize());
-                System.out.println(signature.getKG().add(xG.multiply(e)).normalize());
-                return true;
+
+
+
+//                BigInteger xXI= Helper.randomBigInteger();
+//                BigInteger vI= new BigInteger("5");
+//
+//                ECPoint XI= Main.G.multiply(xXI).add(Main.H.multiply(vI)).normalize();
+//
+//                BigInteger xYI= Helper.randomBigInteger();
+//                ECPoint YI=Main.G.multiply(xYI).add(Main.H.multiply(vI)).normalize();
+//
+//                ECPoint xGI=Main.G.multiply(xYI.subtract(xXI)).normalize();
+
+                Helper.writeLog("Y-X-xG: "+ Y_X.subtract(xG).toString()+"\n");
+//                Helper.writeLog("Y+YI-X-XI-xG-xGI: "+ Y_X.add(YI).subtract(XI).subtract(xGI).subtract(xG).normalize().toString()+"\n");
+
+
+//                System.out.println(Y_X);
+//                System.out.println(xG.add(Main.G.multiply(Sender.oS)).normalize());
+
+//                System.out.println(Main.G.multiply(signature.getS()).normalize());
+//                System.out.println(signature.getKG().add(xG.multiply(e)).normalize());
+                return Helper.verifySignature(signature,xG,e);
             }
         }
 
@@ -715,6 +770,22 @@ public class User {
                 @Override
                 public void run() {
                     try {
+                        int in = socket.getInputStream().read();
+                        if(in==0){
+                            //request for transfer
+                            Helper.getFile(REQUEST_R,socket);
+                            Helper.writeLog("Request file is received");
+                            parseRequestFile();
+                            prepareResponse();
+                            prepareResponseFile();
+                            sendResponseFile();
+                        }
+                        else if(in==1){
+                            Helper.getFile(Sender.TRANSACTION,socket);
+                            Helper.writeLog("Transaction file is received");
+                            Recipient.Verifier.parseTransactionFile();
+                            Recipient.Verifier.verifyTransaction();
+                        }
 
 //                        File file = new File(REQUEST_R);
 //                        FileOutputStream fos = new FileOutputStream(file.getPath());
@@ -740,20 +811,6 @@ public class User {
 ////                                    System.out.println(in);
 ////                                output.write(buffer, 0, count);
 //                                }
-                        int in = socket.getInputStream().read();
-                        if(in==0){
-                            //request for transfer
-                            Helper.getFile(REQUEST_R,socket);
-                            Helper.writeLog("Request file is received");
-                            parseRequestFile();
-                            prepareResponseFile();
-                        }
-                        else if(in==1){
-                            Helper.getFile(Sender.TRANSACTION,socket);
-                            Recipient.Verifier.parseTransactionFile();
-                            Recipient.Verifier.verify();
-                            Helper.writeLog("Transaction file is received");
-                        }
 //                        InputStream in = socket.getInputStream();
 //                        OutputStream out=new FileOutputStream(REQUEST_R);
 //
@@ -784,7 +841,7 @@ public class User {
                     } finally {
 
                         server.clients.remove(this.id);
-                        Helper.writeLog("Node "+  socket.getInetAddress().toString()+" disconnected");
+                        Helper.writeLog("Node "+  socket.getInetAddress().toString()+" disconnected\n\n\n");
                     }
                 }
 
@@ -824,17 +881,22 @@ public class User {
             }
         }
 
-        private static void prepareResponseFile(){
+        private static void prepareResponse(){
             recipientOutput =Main.G.multiply(xR).add(Main.H.multiply(amountToSend)).normalize();
-            Helper.writeLog("Recipient output: "+ recipientOutput.toString());
 
             sR =Helper.getPartialSignature(lockHeight, kSG, xSG, kRG, xRG, kR, xR);
 
-            Helper.writeLog("Recipient new blinding factor for output (xR): "+ xR +"\nPoint xRG: "+ xRG +"\nRecipient's nonce (kR): "+ kR +"\nPoint kRG: "+ kSG);
-            Helper.writeLog("Recipient Schnorr signature (sR): "+ sR);
+            Helper.writeLog("Recipient new blinding factor (xR) for output: "+ xR +
+                    "\nPoint xRG=xR*G: "+ xRG +"\nRecipient's nonce (kR): "+ kR +"\nPoint kRG=kr*G: "+ kSG);
+            Helper.writeLog("Recipient output (Y=xR*G+amountToSend*H): "+ recipientOutput.toString());
+            Helper.writeLog("Variable e=SHA256(kG | xG | M): " +
+                    Helper.getE(lockHeight,kRG.add(kSG).normalize(),xRG.add(xSG).normalize()).toString()+
+                    "\n(Where M= Message of transaction)");
+            Helper.writeLog("Recipient Schnorr signature (sR=kR+e*xR): "+ sR);
 
+        }
 
-
+        private static void prepareResponseFile(){
             JSONObject jo = new JSONObject();
             jo.put(SR, sR.toString());
             jo.put(KRG, kRG.toString());
@@ -847,11 +909,6 @@ public class User {
                 fileWriter.flush();
                 fileWriter.close();
 
-            } catch (IOException exception) {
-                exception.printStackTrace();
-            }
-            try {
-                sendResponseFile();
             } catch (IOException exception) {
                 exception.printStackTrace();
             }
@@ -877,7 +934,8 @@ public class User {
 //            }
 //            out.write("/".getBytes());
             Helper.sendFile(RESPONSE_R,server.clients.get(0).socket);
-            Helper.writeLog("Response file is sent\n\n\n");
+            Helper.writeLog("Response file is sent\nThere are:\n"+Recipient.SR+"\n"+
+                    Recipient.KRG+"\n"+Recipient.XRG+"\n"+Recipient.RECIPIENTOUTPUT+"\n");
 //            System.out.println(6.5);
 
 //            server.clients.get(0).output.write(fileContent);
@@ -913,8 +971,7 @@ public class User {
         Sender.makeTransactionFile();
 
         Recipient.Verifier.parseTransactionFile();
-        Recipient.Verifier.verify();
-
+        Recipient.Verifier.verifyTransaction();
 
 //        Sender.makeConnection();
 
